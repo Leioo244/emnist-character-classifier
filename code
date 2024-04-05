@@ -1,0 +1,73 @@
+import torch
+import torch.nn as nn
+import torch.optim as optim
+from torchvision.datasets import MNIST
+from torchvision.transforms import ToTensor
+from torch.utils.data import DataLoader
+
+
+#simple neural network architecture
+class SingleLayerNN(nn.Module):
+    # Initialization of the neural network with one layer
+    def __init__(self, input_size, num_classes):
+        super(SingleLayerNN, self).__init__()
+        self.layer = nn.Linear(input_size, num_classes)
+
+
+    #Forward pass through the network
+    def forward(self, x):
+        return self.layer(x)
+
+#Load the MNIST dataset
+train_data = MNIST(root='./datasets', train=True, download=True, transform=ToTensor())
+test_data = MNIST(root='./datasets', train=False, download=True, transform=ToTensor())
+
+#data loaders for batching
+batch_size = 64
+train_loader = DataLoader(train_data, batch_size=batch_size, shuffle=True)
+test_loader = DataLoader(test_data, batch_size=batch_size, shuffle=False)
+
+#loss function and optimizer for training
+input_size = 28*28  # Size of MNIST images
+num_classes = 10  # Number of classes (digits 0-9)
+model = SingleLayerNN(input_size, num_classes)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
+
+#moving the model to the GPU 
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+model.to(device)
+
+# Training loop
+num_epochs = 10
+for epoch in range(num_epochs):
+    model.train()
+    for images, labels in train_loader:
+        # Prepare data
+        images = images.view(-1, input_size).to(device)
+        labels = labels.to(device)
+        # Forward pass and loss calculation
+        outputs = model(images)
+        loss = criterion(outputs, labels)
+        # Backward pass and optimization
+        optimizer.zero_grad()
+        loss.backward()
+        optimizer.step()
+
+#Testing the model
+model.eval()
+with torch.no_grad():
+    correct = 0
+    total = 0
+    for images, labels in test_loader:
+        # Prepare data
+        images = images.view(-1, input_size).to(device)
+        labels = labels.to(device)
+        # Forward pass
+        outputs = model(images)
+        _, predicted = torch.max(outputs.data, 1)
+        total += labels.size(0)
+        correct += (predicted == labels).sum().item()
+        
+    #Print accuracy
+    print(f'Accuracy: {100 * correct / total} %')
